@@ -202,3 +202,29 @@ func TestHLLGob(t *testing.T) {
 		t.Error("unmarshaled structure differs")
 	}
 }
+
+func TestHLLNewReg(t *testing.T) {
+	_, err := NewReg(make([]uint8, 1<<3))
+	if err == nil {
+		t.Error("expected error")
+	}
+	_, err = NewReg(make([]uint8, 1<<17))
+	if err == nil {
+		t.Error("expected error")
+	}
+
+	h, _ := New(16)
+	h.Add(fakeHash32(0x00010fff))
+	h.Add(fakeHash32(0x00020fff))
+	h.Add(fakeHash32(0x00030fff))
+	h.Add(fakeHash32(0x00040fff))
+	h.Add(fakeHash32(0x00050fff))
+	h.Add(fakeHash32(0x00050fff))
+
+	h2, err := NewReg(h.Registers())
+	if err != nil {
+		t.Error(err)
+	} else if !reflect.DeepEqual(h, h2) {
+		t.Error("HLLs differs")
+	}
+}

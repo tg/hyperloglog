@@ -39,6 +39,32 @@ func New(precision uint8) (*HyperLogLog, error) {
 	return h, nil
 }
 
+// NewReg creates HyperLogLog, which uses passed array as registers.
+func NewReg(reg []uint8) (*HyperLogLog, error) {
+	if len(reg) > (1<<16) || len(reg) < (1<<4) {
+		return nil, errors.New("number of registers out of range")
+	}
+
+	p := 31 - clz32(uint32(len(reg)))
+	m := 1 << uint32(p)
+	if m != len(reg) {
+		return nil, errors.New("invalid number of registers (must be power of 2)")
+	}
+
+	h := &HyperLogLog{
+		p:   uint8(p),
+		m:   uint32(m),
+		reg: reg,
+	}
+
+	return h, nil
+}
+
+// Registers returns raw registers of HyperLogLog.
+func (h *HyperLogLog) Registers() []uint8 {
+	return h.reg
+}
+
 // Clear sets HyperLogLog h back to its initial state.
 func (h *HyperLogLog) Clear() {
 	h.reg = make([]uint8, h.m)
