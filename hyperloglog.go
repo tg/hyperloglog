@@ -65,6 +65,18 @@ func (h *HyperLogLog) Registers() []uint8 {
 	return h.reg
 }
 
+// Copy returns copy of HyperLogLog.
+func (h *HyperLogLog) Copy() *HyperLogLog {
+	reg := make([]byte, len(h.reg))
+	copy(reg, h.reg)
+	h, err := NewReg(reg)
+	if err != nil {
+		// should never happen assuming h is correct
+		panic(err)
+	}
+	return h
+}
+
 // Clear sets HyperLogLog h back to its initial state.
 func (h *HyperLogLog) Clear() {
 	h.reg = make([]uint8, h.m)
