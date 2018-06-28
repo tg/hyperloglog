@@ -13,6 +13,7 @@ package hyperloglog
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/gob"
 	"errors"
 	"math"
@@ -150,5 +151,27 @@ func (h *HyperLogLog) GobDecode(b []byte) error {
 	if err := dec.Decode(&h.p); err != nil {
 		return err
 	}
+	return nil
+}
+
+// MarshalText marshals HLL into text data (registers as base64)
+func (h *HyperLogLog) MarshalText() ([]byte, error) {
+	dst := make([]byte, base64.StdEncoding.EncodedLen(len(h.reg)))
+	base64.StdEncoding.Encode(dst, h.reg)
+	return dst, nil
+}
+
+// UnmarshalText unmarshals HLL from text data produced by MarshalText
+func (h *HyperLogLog) UnmarshalText(text []byte) error {
+	reg := make([]byte, base64.StdEncoding.DecodedLen(len(text)))
+	n, err := base64.StdEncoding.Decode(reg, text)
+	if err != nil {
+		return err
+	}
+	h2, err := NewReg(reg[:n])
+	if err != nil {
+		return err
+	}
+	*h = *h2
 	return nil
 }

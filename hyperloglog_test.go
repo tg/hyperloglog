@@ -3,7 +3,10 @@ package hyperloglog
 import (
 	"bytes"
 	"encoding/gob"
+	"encoding/json"
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -226,5 +229,59 @@ func TestHLLNewReg(t *testing.T) {
 		t.Error(err)
 	} else if !reflect.DeepEqual(h, h2) {
 		t.Error("HLLs differs")
+	}
+}
+
+func TestHLL_TextMarshaler(t *testing.T) {
+	h, _ := New(10)
+	h.Add(fakeHash32(0x00010fff))
+	h.Add(fakeHash32(0x00020fff))
+	h.Add(fakeHash32(0x00030fff))
+	h.Add(fakeHash32(0x00040fff))
+	h.Add(fakeHash32(0x00050fff))
+	h.Add(fakeHash32(0x00050fff))
+
+	txt, err := h.MarshalText()
+	t.Logf("hll as text: %s", txt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log("txt size:", len(txt))
+
+	h2 := new(HyperLogLog)
+	if err := h2.UnmarshalText(txt); err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(h, h2) {
+		t.Fatalf("HLLs differs:\n%v\n%v", h.p, h2.p)
+	}
+}
+
+// make sure JSON uses text marshaler
+func TestHLL_JSON(t *testing.T) {
+	h, _ := New(10)
+	h.Add(fakeHash32(0x00010fff))
+	h.Add(fakeHash32(0x00020fff))
+	h.Add(fakeHash32(0x00030fff))
+	h.Add(fakeHash32(0x00040fff))
+	h.Add(fakeHash32(0x00050fff))
+	h.Add(fakeHash32(0x00050fff))
+
+	// Get text representation of HLL
+	text, err := h.MarshalText()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Encode JSON
+	jd, err := json.Marshal(h)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Compare(fmt.Sprintf(`"%s"`, text), string(jd)) != 0 {
+		t.Fatalf("%s", jd)
 	}
 }
