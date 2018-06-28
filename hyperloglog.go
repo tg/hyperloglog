@@ -161,7 +161,7 @@ func (h *HyperLogLog) MarshalText() ([]byte, error) {
 	return dst, nil
 }
 
-// UnmarshalText unmarshals HLL from text data produced by MarshalText
+// UnmarshalText unmarshals HLL from text data prod by MarshalText
 func (h *HyperLogLog) UnmarshalText(text []byte) error {
 	reg := make([]byte, base64.StdEncoding.DecodedLen(len(text)))
 	n, err := base64.StdEncoding.Decode(reg, text)

@@ -55,6 +55,11 @@ func TestHLLAdd(t *testing.T) {
 }
 
 func TestHLLCount(t *testing.T) {
+	var empty HyperLogLog
+	if c := empty.Count(); c != 0 {
+		t.Errorf("zero-initiated hll count: %d", c)
+	}
+
 	h, _ := New(16)
 
 	n := h.Count()
