@@ -1,6 +1,10 @@
 package hyperloglog
 
-import "math"
+import (
+	"math/bits"
+
+	"math"
+)
 
 type Hash32 interface {
 	Sum32() uint32
@@ -31,54 +35,12 @@ func alpha(m uint32) float64 {
 	return 0.7213 / (1 + 1.079/float64(m))
 }
 
-var clzLookup = []uint8{
-	32, 31, 30, 30, 29, 29, 29, 29, 28, 28, 28, 28, 28, 28, 28, 28,
-}
-
-// This optimized clz32 algorithm is from:
-// 	 http://embeddedgurus.com/state-space/2014/09/
-// 	 		fast-deterministic-and-portable-counting-leading-zeros/
 func clz32(x uint32) uint8 {
-	var n uint8
-
-	if x >= (1 << 16) {
-		if x >= (1 << 24) {
-			if x >= (1 << 28) {
-				n = 28
-			} else {
-				n = 24
-			}
-		} else {
-			if x >= (1 << 20) {
-				n = 20
-			} else {
-				n = 16
-			}
-		}
-	} else {
-		if x >= (1 << 8) {
-			if x >= (1 << 12) {
-				n = 12
-			} else {
-				n = 8
-			}
-		} else {
-			if x >= (1 << 4) {
-				n = 4
-			} else {
-				n = 0
-			}
-		}
-	}
-	return clzLookup[x>>n] - n
+	return uint8(bits.LeadingZeros32(x))
 }
 
 func clz64(x uint64) uint8 {
-	var c uint8
-	for m := uint64(1 << 63); m&x == 0 && m != 0; m >>= 1 {
-		c++
-	}
-	return c
+	return uint8(bits.LeadingZeros64(x))
 }
 
 // Extract bits from uint32 using LSB 0 numbering, including lo.
