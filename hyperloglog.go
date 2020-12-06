@@ -112,7 +112,8 @@ func (h *HyperLogLog) Merge(other *HyperLogLog) error {
 }
 
 // Count returns the cardinality estimate.
-func (h *HyperLogLog) Count() uint64 {
+// TODO: remove if Count() approved
+func (h *HyperLogLog) Count2() uint64 {
 	est := calculateEstimate(h.reg)
 	if est <= float64(h.m)*2.5 {
 		if v := countZeros(h.reg); v != 0 {
@@ -123,6 +124,49 @@ func (h *HyperLogLog) Count() uint64 {
 		return uint64(est)
 	}
 	return uint64(-two32 * math.Log(1-est/two32))
+}
+
+func (h *HyperLogLog) Count() uint64 {
+	var (
+		est          = 0.
+		size         = len(h.reg)
+		two32 uint64 = 1 << 32
+		sum          = 0.0
+		zeros int
+	)
+
+	if size == 0 {
+		return 0
+	}
+
+	for _, val := range h.reg {
+		sum += 1.0 / float64(uint64(1)<<val)
+		if val == 0 {
+			zeros++
+		}
+	}
+
+	if size == 16 {
+		est = 0.673
+	} else if size == 32 {
+		est = 0.697
+	} else if size == 64 {
+		est = 0.709
+	} else {
+		est = 0.7213 / (1 + 1.079/float64(size))
+	}
+	est = est * float64(size*size) / sum
+
+	if est <= float64(size)*2.5 {
+		if zeros > 0 {
+			return uint64(float64(size) * math.Log(float64(size)/float64(zeros)))
+		}
+		return uint64(est)
+	} else if uint64(est) < two32/30 {
+		return uint64(est)
+	}
+
+	return -two32 * uint64(math.Log(1.-float64(uint64(est)/two32)))
 }
 
 // Encode HyperLogLog into a gob

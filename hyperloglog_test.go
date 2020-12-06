@@ -8,6 +8,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/spaolacci/murmur3"
 )
 
 type fakeHash32 uint32
@@ -60,23 +62,25 @@ func TestHLLCount(t *testing.T) {
 		t.Errorf("zero-initiated hll count: %d", c)
 	}
 
-	h, _ := New(16)
+	// TODO: make this test pass for smaller p
+	for p := byte(11); p <= 16; p++ {
+		h, _ := New(p)
 
-	n := h.Count()
-	if n != 0 {
-		t.Error(n)
-	}
+		n := h.Count()
+		if n != 0 {
+			t.Error(n)
+		}
 
-	h.Add(fakeHash32(0x00010fff))
-	h.Add(fakeHash32(0x00020fff))
-	h.Add(fakeHash32(0x00030fff))
-	h.Add(fakeHash32(0x00040fff))
-	h.Add(fakeHash32(0x00050fff))
-	h.Add(fakeHash32(0x00050fff))
+		for i := 1; i <= 8; i++ {
+			var b [16]byte
+			b[0] = byte(i)
+			h.Add(fakeHash32(murmur3.Sum32(b[:])))
 
-	n = h.Count()
-	if n != 5 {
-		t.Error(n)
+			n = h.Count()
+			if n != uint64(i) {
+				t.Error(p, n, i)
+			}
+		}
 	}
 }
 
