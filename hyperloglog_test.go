@@ -1,12 +1,7 @@
 package hyperloglog
 
 import (
-	"bytes"
-	"encoding/gob"
-	"encoding/json"
-	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/spaolacci/murmur3"
@@ -63,7 +58,7 @@ func TestHLLCount(t *testing.T) {
 	}
 
 	// TODO: make this test pass for smaller p
-	for p := byte(11); p <= 16; p++ {
+	for p := 11; p <= 16; p++ {
 		h, _ := New(p)
 
 		n := h.Count()
@@ -190,31 +185,6 @@ func TestHLLError(t *testing.T) {
 	}
 }
 
-func TestHLLGob(t *testing.T) {
-	var c1, c2 struct {
-		HLL   *HyperLogLog
-		Count int
-	}
-	c1.HLL, _ = New(8)
-	for _, h := range []fakeHash32{0x10fff, 0x20fff, 0x30fff, 0x40fff, 0x50fff} {
-		c1.HLL.Add(h)
-		c1.Count++
-	}
-
-	var buf bytes.Buffer
-
-	if err := gob.NewEncoder(&buf).Encode(&c1); err != nil {
-		t.Error(err)
-	}
-	if err := gob.NewDecoder(&buf).Decode(&c2); err != nil {
-		t.Error(err)
-	}
-
-	if !reflect.DeepEqual(c1, c2) {
-		t.Error("unmarshaled structure differs")
-	}
-}
-
 func TestHLLNewReg(t *testing.T) {
 	_, err := NewReg(make([]uint8, 1<<3))
 	if err == nil {
@@ -241,56 +211,54 @@ func TestHLLNewReg(t *testing.T) {
 	}
 }
 
-func TestHLL_TextMarshaler(t *testing.T) {
-	h, _ := New(10)
-	h.Add(fakeHash32(0x00010fff))
-	h.Add(fakeHash32(0x00020fff))
-	h.Add(fakeHash32(0x00030fff))
-	h.Add(fakeHash32(0x00040fff))
-	h.Add(fakeHash32(0x00050fff))
-	h.Add(fakeHash32(0x00050fff))
-
-	txt, err := h.MarshalText()
-	t.Logf("hll as text: %s", txt)
-	if err != nil {
-		t.Fatal(err)
+func TestEB32(t *testing.T) {
+	n := eb32(0xffffffff, 3, 1)
+	if n != 3 {
+		t.Error(n)
 	}
 
-	t.Log("txt size:", len(txt))
-
-	h2 := new(HyperLogLog)
-	if err := h2.UnmarshalText(txt); err != nil {
-		t.Fatal(err)
+	n = eb32(0xffffffff, 32, 0)
+	if n != 0xffffffff {
+		t.Error(n)
 	}
 
-	if !reflect.DeepEqual(h, h2) {
-		t.Fatalf("HLLs differs:\n%v\n%v", h.p, h2.p)
-	}
-}
-
-// make sure JSON uses text marshaler
-func TestHLL_JSON(t *testing.T) {
-	h, _ := New(10)
-	h.Add(fakeHash32(0x00010fff))
-	h.Add(fakeHash32(0x00020fff))
-	h.Add(fakeHash32(0x00030fff))
-	h.Add(fakeHash32(0x00040fff))
-	h.Add(fakeHash32(0x00050fff))
-	h.Add(fakeHash32(0x00050fff))
-
-	// Get text representation of HLL
-	text, err := h.MarshalText()
-	if err != nil {
-		t.Fatal(err)
+	n = eb32(0xffffffff, 35, 0)
+	if n != 0xffffffff {
+		t.Error(n)
 	}
 
-	// Encode JSON
-	jd, err := json.Marshal(h)
-	if err != nil {
-		t.Fatal(err)
+	n = eb32(0xffffffff, 32, 10)
+	if n != 0x3fffff {
+		t.Error(n)
 	}
 
-	if strings.Compare(fmt.Sprintf(`"%s"`, text), string(jd)) != 0 {
-		t.Fatalf("%s", jd)
+	n = eb32(0xf001, 32, 16)
+	if n != 0 {
+		t.Error(n)
+	}
+
+	n = eb32(0xf001, 16, 0)
+	if n != 0xf001 {
+		t.Error(n)
+	}
+
+	n = eb32(0xf001, 12, 0)
+	if n != 1 {
+		t.Error(n)
+	}
+
+	n = eb32(0xf001, 16, 1)
+	if n != 0x7800 {
+		t.Error(n)
+	}
+
+	n = eb32(0x1211, 13, 2)
+	if n != 0x484 {
+		t.Error(n)
+	}
+
+	n = eb32(0x10000000, 32, 1)
+	if n != 0x8000000 {
+		t.Error(n)
 	}
 }

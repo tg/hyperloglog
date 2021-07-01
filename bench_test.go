@@ -26,9 +26,8 @@ func randStr(n int) string {
 	return fmt.Sprintf("%d %d", i, n)
 }
 
-func benchmark(b *testing.B, precision uint8) {
+func benchmark(b *testing.B, precision int) {
 	h, _ := New(precision)
-	hpp, _ := NewPlus(precision)
 
 	items := make([]string, b.N)
 	for i := 0; i < len(items); i++ {
@@ -39,12 +38,10 @@ func benchmark(b *testing.B, precision uint8) {
 	for _, s := range items {
 		h.Add(hash32(s))
 		h.Add(hash32(s))
-		hpp.Add(hash64(s))
-		hpp.Add(hash64(s))
 	}
 	b.StopTimer()
 
-	e, epp := h.Count(), hpp.Count()
+	e := h.Count()
 
 	var percentErr = func(est uint64) float64 {
 		return math.Abs(float64(b.N)-float64(est)) / float64(b.N)
@@ -52,7 +49,6 @@ func benchmark(b *testing.B, precision uint8) {
 
 	fmt.Printf("\nReal Cardinality: %8d\n", b.N)
 	fmt.Printf("HyperLogLog     : %8d,   Error: %f%%\n", e, percentErr(e))
-	fmt.Printf("HyperLogLog++   : %8d,   Error: %f%%\n", epp, percentErr(epp))
 }
 
 func BenchmarkHll4(b *testing.B) {

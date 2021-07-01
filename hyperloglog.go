@@ -12,29 +12,32 @@
 package hyperloglog
 
 import (
-	"bytes"
-	"encoding/base64"
-	"encoding/gob"
 	"errors"
 	"math"
+	"math/bits"
 )
 
 const two32 = 1 << 32
 
+const (
+	PrecisionMin = 4
+	PrecisionMax = 16
+)
+
 type HyperLogLog struct {
 	reg []uint8
 	m   uint32
-	p   uint8
+	p   int
 }
 
 // New returns a new initialized HyperLogLog.
-func New(precision uint8) (*HyperLogLog, error) {
-	if precision > 16 || precision < 4 {
+func New(precision int) (*HyperLogLog, error) {
+	if precision > PrecisionMax || precision < PrecisionMin {
 		return nil, errors.New("precision must be between 4 and 16")
 	}
 
 	h := &HyperLogLog{}
-	h.p = precision
+	h.p = int(precision)
 	h.m = 1 << precision
 	h.reg = make([]uint8, h.m)
 	return h, nil
@@ -53,7 +56,7 @@ func NewReg(reg []uint8) (*HyperLogLog, error) {
 	}
 
 	h := &HyperLogLog{
-		p:   uint8(p),
+		p:   int(p),
 		m:   uint32(m),
 		reg: reg,
 	}
@@ -86,8 +89,8 @@ func (h *HyperLogLog) Clear() {
 // Add adds a new item to HyperLogLog h.
 func (h *HyperLogLog) Add(item Hash32) bool {
 	x := item.Sum32()
-	i := eb32(x, 32, 32-h.p) // {x31,...,x32-p}
-	w := x<<h.p | 1<<(h.p-1) // {x32-p,...,x0}
+	i := eb32(x, 32, uint8(32-h.p)) // {x31,...,x32-p}
+	w := x<<h.p | 1<<(h.p-1)        // {x32-p,...,x0}
 
 	zeroBits := clz32(w) + 1
 	if zeroBits > h.reg[i] {
@@ -113,18 +116,18 @@ func (h *HyperLogLog) Merge(other *HyperLogLog) error {
 
 // Count returns the cardinality estimate.
 // TODO: remove if Count() approved
-func (h *HyperLogLog) Count2() uint64 {
-	est := calculateEstimate(h.reg)
-	if est <= float64(h.m)*2.5 {
-		if v := countZeros(h.reg); v != 0 {
-			return uint64(linearCounting(h.m, v))
-		}
-		return uint64(est)
-	} else if est < two32/30 {
-		return uint64(est)
-	}
-	return uint64(-two32 * math.Log(1-est/two32))
-}
+// func (h *HyperLogLog) Count2() uint64 {
+// 	est := calculateEstimate(h.reg)
+// 	if est <= float64(h.m)*2.5 {
+// 		if v := countZeros(h.reg); v != 0 {
+// 			return uint64(linearCounting(h.m, v))
+// 		}
+// 		return uint64(est)
+// 	} else if est < two32/30 {
+// 		return uint64(est)
+// 	}
+// 	return uint64(-two32 * math.Log(1-est/two32))
+// }
 
 func (h *HyperLogLog) Count() uint64 {
 	var (
@@ -169,55 +172,20 @@ func (h *HyperLogLog) Count() uint64 {
 	return -two32 * uint64(math.Log(1.-float64(uint64(est)/two32)))
 }
 
-// Encode HyperLogLog into a gob
-func (h *HyperLogLog) GobEncode() ([]byte, error) {
-	buf := bytes.Buffer{}
-	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(h.reg); err != nil {
-		return nil, err
-	}
-	if err := enc.Encode(h.m); err != nil {
-		return nil, err
-	}
-	if err := enc.Encode(h.p); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+func (h *HyperLogLog) Precision() int {
+	return h.p
 }
 
-// Decode gob into a HyperLogLog structure
-func (h *HyperLogLog) GobDecode(b []byte) error {
-	dec := gob.NewDecoder(bytes.NewBuffer(b))
-	if err := dec.Decode(&h.reg); err != nil {
-		return err
-	}
-	if err := dec.Decode(&h.m); err != nil {
-		return err
-	}
-	if err := dec.Decode(&h.p); err != nil {
-		return err
-	}
-	return nil
+func clz32(x uint32) uint8 {
+	return uint8(bits.LeadingZeros32(x))
 }
 
-// MarshalText marshals HLL into text data (registers as base64)
-func (h *HyperLogLog) MarshalText() ([]byte, error) {
-	dst := make([]byte, base64.StdEncoding.EncodedLen(len(h.reg)))
-	base64.StdEncoding.Encode(dst, h.reg)
-	return dst, nil
+// Extract bits from uint32 using LSB 0 numbering, including lo.
+func eb32(bits uint32, hi uint8, lo uint8) uint32 {
+	m := uint32(((1 << (hi - lo)) - 1) << lo)
+	return (bits & m) >> lo
 }
 
-// UnmarshalText unmarshals HLL from text data prod by MarshalText
-func (h *HyperLogLog) UnmarshalText(text []byte) error {
-	reg := make([]byte, base64.StdEncoding.DecodedLen(len(text)))
-	n, err := base64.StdEncoding.Decode(reg, text)
-	if err != nil {
-		return err
-	}
-	h2, err := NewReg(reg[:n])
-	if err != nil {
-		return err
-	}
-	*h = *h2
-	return nil
+type Hash32 interface {
+	Sum32() uint32
 }
